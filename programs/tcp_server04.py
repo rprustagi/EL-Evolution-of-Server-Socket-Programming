@@ -17,12 +17,13 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 srvr_addr = (ip_addr, port)
 sock.bind(srvr_addr)
 sock.listen(1)
-connsock, client = sock.accept()
-
-while True:
+while True: # perpetual loop to accept next client request
+  connsock, client = sock.accept()
+  while True:
     data = connsock.recv(buffer)
     if not data:
         break
     print(data.decode())
-connsock.close()
-
+    connsock.send(data.decode().upper().encode())
+  connsock.close()
+# code should never reach here.

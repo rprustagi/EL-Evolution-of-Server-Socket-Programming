@@ -15,8 +15,10 @@ buffer = args.buffer
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 srvr_addr = (ip_addr, port)
-sock.bind(srvr_addr)
-sock.listen(1)
+sock.bind(srvr_addr); print(time.asctime())
+time.sleep(60)
+sock.listen(1); print(time.asctime())
+time.sleep(60); print(time.asctime())
 connsock, client = sock.accept()
 
 while True:
