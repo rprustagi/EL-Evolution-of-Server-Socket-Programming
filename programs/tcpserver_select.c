@@ -20,11 +20,11 @@
 #include <arpa/inet.h>
 
 /* server configuration parameters */
-#define SERVER_PORT     12345
+#define SERVER_PORT     9999
 #define LISTENQ         2         /* 2nd argument to listen () */
 #define BUFFSIZE        8192      /* buffer size for reads and writes */
 
-#define  MAX_CLIENTS    1000
+#define  MAX_CLIENTS    1024
 #define  SELECT_TIMEOUT 10
 
 int str_echo(int fd);
@@ -43,6 +43,7 @@ int main(int argc, char **argv) {
   fd_set  wk_rset; /* working read set */
   fd_set  wk_wset; /* working write set */
   struct timeval timeout;
+  int select_timeout = SELECT_TIMEOUT;
 
   int max_fd; /* max socket fd value */
   int client_sock[MAX_CLIENTS];
@@ -51,7 +52,7 @@ int main(int argc, char **argv) {
   int cnt;  /* count of sockets of interest at an invocation */
   int status;
 
-  while ((opt = getopt(argc, argv, "i:p:")) != -1) {
+  while ((opt = getopt(argc, argv, "i:p:t:")) != -1) {
     switch (opt) {
     case 'i':
       ip_addr = optarg;
@@ -61,15 +62,19 @@ int main(int argc, char **argv) {
       port = atoi(optarg);
       break;
 
+    case 't':
+      select_timeout = atoi(optarg);
+      break;
+
     default:
-      fprintf(stderr, "Usage: %s -i ipaddr -p port\n", argv[0]);
+      fprintf(stderr, "Usage: %s -i <ipaddr> -p <port> -t <timeout(s)>\n", argv[0]);
       exit(1);
       break;
     } /* switch(opt) */
   } /* while (opt...) */
 
   if ((port == 0) || (ip_addr == (char *)NULL)) {
-    fprintf(stderr, "error in  paddr or port number value\n");
+    fprintf(stderr, "error in  ipaddr or port number value\n");
     exit(1);
   }
 
@@ -105,7 +110,7 @@ int main(int argc, char **argv) {
       }
     }
     /* set some timeout value */
-    timeout.tv_sec = SELECT_TIMEOUT;
+    timeout.tv_sec = select_timeout;
     timeout.tv_usec = 0;
 
     cnt = select(max_fd, &wk_rset, &wk_wset, NULL, &timeout);
@@ -113,20 +118,20 @@ int main(int argc, char **argv) {
       fprintf(stderr, "Error %d in select()", errno);
       exit(1);
     } else if (cnt == 0) {
-      printf("Select timeout occurred for timeout of %ds\n", SELECT_TIMEOUT);
+      printf("Select timeout occurred for timeout of %ds\n", select_timeout);
       continue;
     }
     /* some sockets are of interest */
     /* check if new connection has arrived */
     if (FD_ISSET(listenfd, &wk_rset)) {
       connfd = accept(listenfd, (struct sockaddr *) &cliaddr, &clilen);
-      if (connfd > MAX_CLIENTS) {
-        fprintf(stderr, "new connection from client %s exceeds server capacity\n", inet_ntoa(cliaddr.sin_addr));
+      if (connfd >= sizeof(fd_set)*8) {
+        fprintf(stderr, "connection from client %s, fd=%d exceeds fdset\n", inet_ntoa(cliaddr.sin_addr), connfd);
         close(connfd); /* beyond capacity of server */
         continue;
       }
       /* new connection is to be made part of master set */
-      printf("new connection from client %s:%d accepted\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
+      printf("connection from client %s:%d accepted, fd=%d\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port), connfd);
       client_sock[connfd] = connfd; /* any true value */
       if (max_fd < connfd + 1) {
         max_fd = connfd + 1;
@@ -148,6 +153,7 @@ int main(int argc, char **argv) {
           FD_CLR(ifd, &rset);
           FD_CLR(ifd, &wset);
           close(ifd);
+          printf("Socket fd %d closed\n", ifd);
         } /* if status <=0 */
       } /* if FD_ISSET */
     } /* for ifd = 0; */
